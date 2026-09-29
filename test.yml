@@ -1,0 +1,262 @@
+services:
+  # ============================================================
+  # MYSQL
+  # ============================================================
+
+  mysql:
+    image: mysql:8.4
+    container_name: appprenotazione-mysql
+    restart: unless-stopped
+
+    environment:
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:-root}
+      MYSQL_DATABASE: ${APP_DB_NAME:-app_prenotazione}
+      MYSQL_USER: ${MYSQL_USER:-app}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD:-app}
+
+    ports:
+      - "${MYSQL_PORT:-3306}:3306"
+
+    volumes:
+      - mysql_data:/var/lib/mysql
+      - ./mysql/init:/docker-entrypoint-initdb.d
+
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "mysqladmin",
+          "ping",
+          "-h",
+          "localhost",
+          "-u",
+          "root",
+          "-p${MYSQL_ROOT_PASSWORD:-root}",
+        ]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+    networks:
+      - appprenotazione
+
+  # ============================================================
+  # KAFKA - KRaft
+  # ============================================================
+
+  kafka:
+    image: apache/kafka:4.0.1
+    container_name: appprenotazione-kafka
+    restart: unless-stopped
+
+    environment:
+      KAFKA_NODE_ID: 1
+      KAFKA_PROCESS_ROLES: broker,controller
+
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: CONTROLLER:PLAINTEXT,PLAINTEXT:PLAINTEXT,EXTERNAL:PLAINTEXT
+
+      KAFKA_LISTENERS: CONTROLLER://:9093,PLAINTEXT://:9092,EXTERNAL://:29092
+
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9092,EXTERNAL://localhost:29092
+
+      KAFKA_CONTROLLER_LISTENER_NAMES: CONTROLLER
+
+      KAFKA_CONTROLLER_QUORUM_VOTERS: 1@kafka:9093
+
+      KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
+
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+
+      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
+
+      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
+
+      KAFKA_GROUP_INITIAL_REBALANCE_DELAY_MS: 0
+
+      KAFKA_AUTO_CREATE_TOPICS_ENABLE: "true"
+
+    ports:
+      - "${KAFKA_PORT:-29092}:29092"
+
+    volumes:
+      - kafka_data:/var/lib/kafka/data
+
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "/opt/kafka/bin/kafka-broker-api-versions.sh --bootstrap-server localhost:9092 > /dev/null 2>&1",
+        ]
+      interval: 10s
+      timeout: 10s
+      retries: 10
+      start_period: 20s
+
+    networks:
+      - appprenotazione
+
+  # ============================================================
+  # KAFKA UI
+  # ============================================================
+
+  kafbat-ui:
+    image: ghcr.io/kafbat/kafka-ui:latest
+    container_name: kafbat-ui
+
+    depends_on:
+      kafka:
+        condition: service_healthy
+
+    environment:
+      KAFKA_CLUSTERS_0_NAME: appprenotazione
+      KAFKA_CLUSTERS_0_BOOTSTRAPSERVERS: kafka:9092
+
+    ports:
+      - "${KAFKA_UI_PORT:-7070}:8080"
+
+    networks:
+      - appprenotazione
+
+
+  # ============================================================
+  # USER SERVICE
+  # ============================================================
+
+  user-service:
+    build:
+      context: ./services/UserService
+      dockerfile: Dockerfile
+
+    container_name: appprenotazione-user-service
+    restart: unless-stopped
+
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:mysql://mysql:3306/${USER_DB_NAME:-user_service}?createDatabaseIfNotExist=true&useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=UTC
+      SPRING_DATASOURCE_USERNAME: ${MYSQL_USER:-app}
+      SPRING_DATASOURCE_PASSWORD: ${MYSQL_PASSWORD:-app}
+
+    ports:
+      - "${USER_SERVICE_PORT:-8081}:9090"
+
+    depends_on:
+      mysql:
+        condition: service_healthy
+
+    networks:
+      - appprenotazione
+
+  # ============================================================
+  # NOTIFICATION SERVICE
+  # ============================================================
+
+  notification-service:
+    build:
+      context: ./services/NotificationService
+      dockerfile: Dockerfile
+
+    container_name: appprenotazione-notification-service
+    restart: unless-stopped
+
+    environment:
+      SPRING_KAFKA_BOOTSTRAP_SERVERS: kafka:9092
+
+      SPRING_DATASOURCE_URL: jdbc:mysql://mysql:3306/${NOTIFICATION_DB_NAME:-notification_service}?createDatabaseIfNotExist=true&useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=UTC
+      SPRING_DATASOURCE_USERNAME: ${MYSQL_USER:-app}
+      SPRING_DATASOURCE_PASSWORD: ${MYSQL_PASSWORD:-app}
+
+      SPRING_MAIL_HOST: ${MAIL_HOST:-}
+      SPRING_MAIL_PORT: ${MAIL_PORT:-587}
+      SPRING_MAIL_USERNAME: ${MAIL_USERNAME:-}
+      SPRING_MAIL_PASSWORD: ${MAIL_PASSWORD:-}
+
+    depends_on:
+      mysql:
+        condition: service_healthy
+
+      kafka:
+        condition: service_healthy
+
+    networks:
+      - appprenotazione
+
+  # ============================================================
+  # MAIN APP - SPRING BOOT
+  # ============================================================
+
+  app-prenotazione:
+    build:
+      context: ./services/AppPrenotazioneSpringBoot
+      dockerfile: Dockerfile
+
+    container_name: appprenotazione-backend
+    restart: unless-stopped
+
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:mysql://mysql:3306/${APP_DB_NAME:-app_prenotazione}?createDatabaseIfNotExist=true&useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=UTC
+      SPRING_DATASOURCE_USERNAME: ${MYSQL_USER:-app}
+      SPRING_DATASOURCE_PASSWORD: ${MYSQL_PASSWORD:-app}
+
+      SPRING_KAFKA_BOOTSTRAP_SERVERS: kafka:9092
+
+      USER_SERVICE_URL: http://user-service:9090
+
+    ports:
+      - "${APP_PORT:-8080}:8080"
+
+    depends_on:
+      mysql:
+        condition: service_healthy
+
+      kafka:
+        condition: service_healthy
+
+      user-service:
+        condition: service_started
+
+      notification-service:
+        condition: service_started
+
+    networks:
+      - appprenotazione
+
+  # ============================================================
+  # ANGULAR FRONTEND
+  # ============================================================
+
+  frontend:
+    build:
+      context: ./services/AppPrenotazioneFrontEnd
+      dockerfile: Dockerfile
+
+    container_name: appprenotazione-frontend
+    restart: unless-stopped
+
+    ports:
+      - "${FRONTEND_PORT:-4200}:80"
+
+    depends_on:
+      - app-prenotazione
+      - user-service
+
+    networks:
+      - appprenotazione
+
+# ==============================================================
+# VOLUMES
+# ==============================================================
+
+volumes:
+  mysql_data:
+    name: appprenotazione_mysql_data
+
+  kafka_data:
+    name: appprenotazione_kafka_data
+
+# ==============================================================
+# NETWORK
+# ==============================================================
+
+networks:
+  appprenotazione:
+    name: appprenotazione_network
+    driver: bridge
