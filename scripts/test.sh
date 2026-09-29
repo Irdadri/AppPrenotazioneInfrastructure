@@ -121,7 +121,7 @@ clone_or_update() {
 clone_or_update \
     "Irdadri/UserService" \
     "UserService" \
-    ""
+    "revision"
 
 clone_or_update \
     "Irdadri/NotificationService" \
@@ -136,7 +136,7 @@ clone_or_update \
 clone_or_update \
     "Irdadri/AppPrenotazioneFrontEnd" \
     "AppPrenotazioneFrontEnd" \
-    ""
+    "jwt"
 
 # ============================================================
 # CREATE ENV FILE
