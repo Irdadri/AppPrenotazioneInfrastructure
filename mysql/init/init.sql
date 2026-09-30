@@ -1,3 +1,9 @@
+GRANT ALL PRIVILEGES ON gestioneutente.* TO 'app'@'%';
+GRANT ALL PRIVILEGES ON notificadb.* TO 'app'@'%';
+GRANT ALL PRIVILEGES ON prenotazioneappdb.* TO 'app'@'%';
+
+FLUSH PRIVILEGES;
+
 -- =========================================================
 -- DATABASE 1: PRENOTAZIONE
 -- =========================================================

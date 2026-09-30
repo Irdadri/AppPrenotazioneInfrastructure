@@ -101,7 +101,7 @@ services:
 
   kafbat-ui:
     image: ghcr.io/kafbat/kafka-ui:latest
-    container_name: kafbat-ui
+    container_name: appprenotazione-kafbat-ui
 
     depends_on:
       kafka:
