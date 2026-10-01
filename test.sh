@@ -129,9 +129,9 @@ clone_or_update \
     ""
 
 clone_or_update \
-    "Irdadri/AppPrenotazioneQuarkus" \
-    "AppPrenotazioneQuarkus" \
-    ""
+    "Irdadri/AppPrenotazioneSpringBoot" \
+    "AppPrenotazioneSpringBoot" \
+    "redis"
 
 clone_or_update \
     "Irdadri/AppPrenotazioneFrontEnd" \
