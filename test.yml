@@ -182,23 +182,22 @@ services:
   # ============================================================
   # MAIN APP - SPRING BOOT
   # ============================================================
-
   app-prenotazione:
     build:
-      context: ./services/AppPrenotazioneSpringBoot
-      dockerfile: Dockerfile
+      context: ./services/AppPrenotazioneQuarkus
+      dockerfile: src/main/docker/Dockerfile.jvm
 
-    container_name: appprenotazione-backend
+    container_name: appprenotazionequarkus-backend
     restart: unless-stopped
 
     environment:
-      SPRING_DATASOURCE_URL: jdbc:mysql://mysql:3306/${APP_DB_NAME:-app_prenotazione}?createDatabaseIfNotExist=true&useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=UTC
-      SPRING_DATASOURCE_USERNAME: ${MYSQL_USER:-app}
-      SPRING_DATASOURCE_PASSWORD: ${MYSQL_PASSWORD:-app}
+      DB_URL: mysql://mysql:3306/${APP_DB_NAME:-app_prenotazione}?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=UTC
+      DB_USERNAME: ${MYSQL_USER:-app}
+      DB_PASSWORD: ${MYSQL_PASSWORD:-app}
 
-      SPRING_KAFKA_BOOTSTRAP_SERVERS: kafka:9092
+      USER_SERVICE_URL: http://user-service:9090/auth
 
-      USER_SERVICE_URL: http://user-service:9090
+      KAFKA_BOOTSTRAP_SERVERS: kafka:9092
 
     ports:
       - "${APP_PORT:-8080}:8080"
@@ -240,6 +239,7 @@ services:
 
     networks:
       - appprenotazione
+
 
 # ==============================================================
 # VOLUMES

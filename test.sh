@@ -129,9 +129,9 @@ clone_or_update \
     ""
 
 clone_or_update \
-    "Irdadri/AppPrenotazioneSpringBoot" \
-    "AppPrenotazioneSpringBoot" \
-    "kafka"
+    "Irdadri/AppPrenotazioneQuarkus" \
+    "AppPrenotazioneQuarkus" \
+    ""
 
 clone_or_update \
     "Irdadri/AppPrenotazioneFrontEnd" \
